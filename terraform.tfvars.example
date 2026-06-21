@@ -1,0 +1,15 @@
+# Copy this to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored - never commit real credentials/ARNs.
+
+aws_region  = "REPLACE_ME"   # e.g. ap-south-1
+environment = "dev"
+
+db_host       = "REPLACE_ME" # RDS endpoint hostname
+db_port       = 3306
+db_name       = "REPLACE_ME" # database/schema name to use
+db_secret_arn = "REPLACE_ME" # Secrets Manager ARN for the scoped DB user
+
+vpc_subnet_ids         = [] # only needed if RDS is in a private VPC
+vpc_security_group_ids = [] # only needed if RDS is in a private VPC
+
+allowed_origin = "https://sapanafertilizer.com"
