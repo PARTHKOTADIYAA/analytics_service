@@ -1,6 +1,6 @@
-output "api_endpoint" {
-  description = "Base URL of the analytics events endpoint"
-  value       = "${module.apigateway.api_endpoint}/events"
+output "api_gateway_invoke_url" {
+  description = "Base URL of the analytics API"
+  value       = module.apigateway.api_gateway_invoke_url
 }
 
 output "lambda_function_name" {
