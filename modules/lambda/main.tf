@@ -1,35 +1,48 @@
-data "archive_file" "lambda_zip" {
+data "archive_file" "zip_the_python_code" {
   type        = "zip"
-  source_dir  = var.source_dir
-  output_path = "${path.module}/build/lambda.zip"
+  source_dir  = "${path.module}/../../src/app/lambda_function"
+  output_path = "${path.module}/../../src/app/lambda-function.zip"
+  excludes    = ["__pycache__", "venv", "tests"]
 }
 
 resource "aws_lambda_function" "this" {
-  function_name = "${var.service_name}-${var.environment}"
-  role          = var.lambda_role_arn
-  handler       = "main.handler"
-  runtime       = "python3.12"
-  timeout       = 10
-  memory_size   = 256
+  filename         = "${path.module}/../../src/app/lambda-function.zip"
+  source_code_hash = filebase64sha256("${path.module}/../../src/app/lambda-function.zip")
 
-  filename         = data.archive_file.lambda_zip.output_path
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  function_name = "${var.function_name}-${var.stage}-lambda"
+  role          = var.lambda_iam_execution_role_arn
+  handler       = "app.handler.handler"
+  runtime       = "python3.13"
+  memory_size   = 512
+  timeout       = 30
 
-  environment {
-    variables = var.environment_variables
+  vpc_config {
+    subnet_ids         = var.private_subnet_ids
+    security_group_ids = [var.lambda_security_group_id]
   }
 
-  # Only attached if vpc_subnet_ids is non-empty (i.e. RDS is private)
-  dynamic "vpc_config" {
-    for_each = length(var.vpc_subnet_ids) > 0 ? [1] : []
-    content {
-      subnet_ids         = var.vpc_subnet_ids
-      security_group_ids = var.vpc_security_group_ids
+  environment {
+    variables = {
+      STAGE                = var.stage
+      POWERTOOLS_LOG_LEVEL = var.stage == "prod" ? "INFO" : "DEBUG"
+      DB_HOST              = var.rds_endpoint
+      DB_USER              = var.db_user
+      DB_NAME              = var.db_name
+      DB_PORT              = "3306"
+      AWS_REGION_NAME      = var.region
     }
   }
 }
 
-resource "aws_cloudwatch_log_group" "this" {
-  name              = "/aws/lambda/${aws_lambda_function.this.function_name}"
-  retention_in_days = 30
+resource "aws_lambda_permission" "central_apigw" {
+  statement_id  = "AllowExecutionFromCentralAPIGateway"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.this.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${var.central_api_gateway_execution_arn}/*/*"
+}
+
+resource "aws_cloudwatch_log_group" "lambda_log_group" {
+  name              = "/aws/lambda/${var.function_name}-${var.stage}-lambda"
+  retention_in_days = 14
 }
